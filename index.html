@@ -183,6 +183,9 @@
     font-size: 12.5px;
     color: var(--text-dim);
     margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .star-btn {
     flex-shrink: 0;
@@ -332,6 +335,45 @@
   [data-view] { display: none; }
   [data-view].active { display: block; }
 
+  .error-note {
+    display: none;
+    background: rgba(201,96,75,0.12);
+    border: 1px solid rgba(201,96,75,0.35);
+    color: #E3A393;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .section-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .section-row .section-label { margin-bottom: 0; }
+  .updated-btn {
+    background: none; border: none; padding: 0;
+    color: var(--text-faint);
+    font-family: 'Archivo', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .search-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'Archivo', sans-serif;
+    font-size: 16px;
+    padding: 12px 14px;
+    margin: 4px 0 16px;
+    outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-faint); }
+  .status-OTHER { background: rgba(74,78,92,0.25); color: #C6C9D6; }
+  .band-OTHER { background: rgba(74,78,92,0.25); color: #C6C9D6; }
+  .placement-chip { width: auto; min-width: 32px; padding: 0 6px; }
+  .checked-in { color: var(--status-ci); }
+  .code-note { font-size: 11px; color: var(--text-faint); margin: 18px 4px 0; }
+
   ::selection { background: var(--accent-soft); }
 </style>
 </head>
@@ -360,12 +402,11 @@
 
     <!-- ============ VIEW: FEIS PICKER ============ -->
     <section data-view="picker" class="active">
-      <div class="proto-note">
-        <span>●</span>
-        <span><strong>Prototype.</strong> Showing sample competitions so we can test the flow. The live iFeis connection comes next, once we've confirmed the full status list at your next feis.</span>
-      </div>
+      <div class="error-note"></div>
       <p class="section-label">Upcoming feiseanna</p>
       <div id="feisList"></div>
+      <p class="section-label" id="recentLabel" style="display:none;">Recently finished</p>
+      <div id="recentList"></div>
     </section>
 
     <!-- ============ VIEW: DASHBOARD ============ -->
@@ -379,7 +420,11 @@
           <div id="venueAddr" style="font-size:12.5px; color:var(--text-dim);">—</div>
         </div>
       </a>
-      <p class="section-label" style="margin-top:0;">My competitions</p>
+      <div class="error-note"></div>
+      <div class="section-row">
+        <p class="section-label" style="margin-top:0;">My competitions</p>
+        <button class="updated-btn" id="dashUpdated" title="Refresh"></button>
+      </div>
       <div id="starredList"></div>
       <div id="starredEmpty" class="empty" style="display:none;">
         Nothing starred yet.<br>Find and star the competitions you're tracking today.
@@ -393,8 +438,10 @@
 
     <!-- ============ VIEW: ADD COMPETITIONS (browse full list) ============ -->
     <section data-view="browse">
-      <p class="section-label">All competitions at this feis</p>
+      <div class="error-note"></div>
+      <input type="search" id="searchInput" class="search-input" placeholder="Search by number or dance, e.g. 206 or reel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <div id="browseList"></div>
+      <button class="browse-toggle" id="showEmptyBtn" style="display:none;"></button>
     </section>
 
     <!-- ============ VIEW: COMPETITION DETAIL ============ -->
@@ -403,8 +450,10 @@
         <p class="label" id="detailLabel">Status</p>
         <p class="value" id="detailValue">—</p>
       </div>
+      <div class="error-note"></div>
       <p class="section-label" id="dancerListLabel">Dancers</p>
       <div id="dancerList"></div>
+      <p class="code-note" id="detailCode"></p>
     </section>
 
     <!-- ============ VIEW: SETTINGS ============ -->
@@ -424,7 +473,7 @@
       <div class="settings-row">
         <div>
           <div class="label">Checking-in alerts</div>
-          <div class="sub">For starred competitions · not active in this prototype</div>
+          <div class="sub">For starred competitions · coming soon</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="notifyCI" checked>
@@ -434,7 +483,7 @@
       <div class="settings-row">
         <div>
           <div class="label">Results alerts</div>
-          <div class="sub">For starred competitions · not active in this prototype</div>
+          <div class="sub">For starred competitions · coming soon</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="notifyRes" checked>
@@ -442,77 +491,73 @@
         </label>
       </div>
 
-      <p class="section-label">About this prototype</p>
+      <p class="section-label">About</p>
       <div class="proto-note" style="margin-bottom:0;">
         <span>●</span>
-        <span>Live status and push notifications need a small companion service polling iFeis on your behalf — that's the next build step. This screen previews what you'll control once it's wired up.</span>
+        <span>Live data comes straight from iFeis and refreshes every minute while the app is open. Push alerts are the next build step.</span>
       </div>
     </section>
 
   </main>
 </div>
 
+
 <script>
 (function(){
-  // ---------- Mock data, shaped like the real api.ifeis.net responses ----------
-  const FEISEANNA = [
-    { id: 'my9fPLN_Vl', name: 'The Good Life Feis', loc_name: 'Raleigh Convention Center', loc_addr: '500 S Salisbury St, Raleigh, NC 27601', dateLabel: 'Sat, Oct 17' },
-    { id: 'qw8pTZa_Rn', name: 'Carolina Classic Oireachtas', loc_name: 'Greensboro Coliseum', loc_addr: '1921 W Gate City Blvd, Greensboro, NC 27403', dateLabel: 'Sat–Sun, Nov 14–15' },
-    { id: 'zx2mVBc_Ko', name: 'Autumn Leaves Feis', loc_name: 'Charlotte Convention Center', loc_addr: '501 S College St, Charlotte, NC 28202', dateLabel: 'Sun, Dec 6' },
-  ];
+  // ---------- iFeis API (public endpoints, no auth) ----------
+  const API = 'https://api.ifeis.net/api';
+  const REFRESH_MS = 60 * 1000;   // go easy: one refresh a minute while the app is open
+
+  async function api(path) {
+    const res = await fetch(API + path, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('iFeis returned ' + res.status);
+    const body = await res.json();
+    return body.data || [];
+  }
+
+  // Keep only what the app shows. Dates of birth are dropped here and never stored or displayed.
+  function cleanDancer(d) {
+    const s = d.score || null;
+    return {
+      id: d.id,
+      fname: d.fname || '',
+      lname: d.lname || '',
+      competitor: d.competitor,
+      school: (d.school && d.school.name) || '',
+      score: s ? { placement: s.placement, placed: s.placed, checkedIn: !!s.is_checked_in } : null,
+    };
+  }
 
   // status codes: PND (not started), CI (checking in), DANCING, TAB (tabulating), QA, RES (results)
-  // NOTE: only PND and RES are confirmed from the real API so far — CI/DANCING/TAB/QA are
-  // placeholders to be confirmed against a live feis, per the investigation notes.
-  const EVENTS = {
-    my9fPLN_Vl: [
-      { id: 'e01', name: '104LJ', event: 'Light Jig', level: 'Beginner', age: 'U8', gender: 'Girls', participants: 12, status: 'RES' },
-      { id: 'e02', name: '112RL', event: 'Reel', level: 'Beginner', age: 'U8', gender: 'Boys', participants: 6, status: 'RES' },
-      { id: 'e03', name: '206LJ', event: 'Light Jig', level: 'Novice', age: 'U10', gender: 'Girls', participants: 24, status: 'QA' },
-      { id: 'e04', name: '207SJ', event: 'Slip Jig', level: 'Novice', age: 'U10', gender: 'Girls', participants: 18, status: 'TAB' },
-      { id: 'e05', name: '214RL', event: 'Reel', level: 'Novice', age: 'U10', gender: 'Boys', participants: 9, status: 'DANCING' },
-      { id: 'e06', name: '308HP', event: 'Hornpipe', level: 'Prizewinner', age: 'U12', gender: 'Girls', participants: 21, status: 'CI' },
-      { id: 'e07', name: '309TR', event: 'Treble Reel', level: 'Prizewinner', age: 'U12', gender: 'Girls', participants: 15, status: 'PND' },
-      { id: 'e08', name: '402LJ', event: 'Light Jig', level: 'Open', age: 'U14', gender: 'Girls', participants: 19, status: 'PND' },
-      { id: 'e09', name: '415RL', event: 'Reel', level: 'Open', age: 'U14', gender: 'Boys', participants: 5, status: 'PND' },
-    ],
-    qw8pTZa_Rn: [
-      { id: 'e21', name: '118RL', event: 'Reel', level: 'Novice', age: 'U9', gender: 'Girls', participants: 22, status: 'PND' },
-      { id: 'e22', name: '204HP', event: 'Hornpipe', level: 'Novice', age: 'U10', gender: 'Girls', participants: 17, status: 'PND' },
-    ],
-    zx2mVBc_Ko: [
-      { id: 'e31', name: '101RL', event: 'Reel', level: 'Beginner', age: 'U7', gender: 'Girls', participants: 10, status: 'PND' },
-    ],
-  };
-
-  function makeDancers(eventId, n, hasResults) {
-    const firstNames = ['Aoife','Maeve','Siobhan','Ciara','Grace','Fiona','Riley','Nora','Ella','Saoirse','Brogan','Kiera','Molly','Tara','Erin','Cara','Niamh','Sadie','Roisin','Delia','Maura','Bridget','Orla','Cliona'];
-    const lastNames = ['Kelly','Byrne','Walsh','Doyle','Murphy','Gallagher','Reilly','Quinn','Casey','Nolan','Sullivan','Fitzgerald','Duffy','Whelan','Brennan'];
-    const schools = ['Ardara Academy','Emerald Isle School','Sheehan-Doyle Irish Dance','Rince na hÉireann','Highland Feis Academy'];
-    const list = [];
-    for (let i = 0; i < n; i++) {
-      const seed = eventId.charCodeAt(2) + i;
-      list.push({
-        id: eventId + '-' + i,
-        fname: firstNames[(seed * 7 + i) % firstNames.length],
-        lname: lastNames[(seed * 3 + i) % lastNames.length],
-        competitor: 1000 + i,
-        school: schools[(seed + i) % schools.length],
-        score: hasResults ? { placement: i + 1, placed: i < 3 } : null,
-      });
-    }
-    if (hasResults) {
-      list.sort((a, b) => a.score.placement - b.score.placement);
-    } else {
-      list.sort((a, b) => a.lname.localeCompare(b.lname));
-    }
-    return list;
+  // The API's `status` field has only been seen as PND or RES, but each competition also carries
+  // lifecycle flags (is_ci_opened, is_ci_closed, is_in_tabs, is_in_qa, is_in_results). We derive
+  // the in-between states from those flags. To be confirmed against a live feis.
+  function deriveStatus(ev) {
+    if (ev.status === 'RES' || ev.is_in_results) return 'RES';
+    if (ev.is_in_qa) return 'QA';
+    if (ev.is_in_tabs) return 'TAB';
+    if (ev.is_ci_opened) return 'CI';
+    if (ev.is_ci_closed) return 'DANCING';
+    if (STATUS_LABEL[ev.status]) return ev.status;
+    return ev.status && ev.status !== 'PND' ? 'OTHER' : 'PND';
   }
 
   const STATUS_LABEL = {
     PND: 'Not started', CI: 'Checking in', DANCING: 'On stage',
     TAB: 'Tabulating', QA: 'Quality assurance', RES: 'Results posted',
   };
+  const GENDER_LABEL = { F: 'Girls', M: 'Boys' };
+
+  function statusLabel(ev) {
+    return ev._status === 'OTHER' ? 'Status: ' + ev.status : STATUS_LABEL[ev._status];
+  }
+
+  function prepEvent(ev) {
+    ev._status = deriveStatus(ev);
+    const parts = [ev.age, GENDER_LABEL[ev.gender], ev.event].filter(Boolean);
+    ev._title = parts.length ? parts.join(' ') : String(ev.description || '').replace(/^\S+\s+-\s+/, '');
+    return ev;
+  }
 
   // ---------- Local state ----------
   const store = {
@@ -525,13 +570,110 @@
 
   let state = {
     feisId: store.get('feisId', null),
-    starred: store.get('starred', []),
+    starredByFeis: store.get('starredByFeis', {}),
+    feiseanna: store.get('feiseannaCache', []),
+    events: {},          // feisId -> [events]
+    eventsUpdatedAt: {}, // feisId -> ms
+    dancers: {},         // eventId -> [dancers], memory only
     view: 'picker',
     detailEventId: null,
-    browseOpen: false,
+    search: '',
+    showEmpty: false,
+    error: null,
   };
+  const cachedEvents = store.get('eventsCache', null);
+  if (cachedEvents && cachedEvents.feisId === state.feisId) {
+    state.events[state.feisId] = cachedEvents.events.map(prepEvent);
+    state.eventsUpdatedAt[state.feisId] = cachedEvents.at;
+  }
 
-  function saveStarred() { store.set('starred', state.starred); }
+  function starredIds() { return state.starredByFeis[state.feisId] || []; }
+  function toggleStar(id) {
+    const list = starredIds().slice();
+    const idx = list.indexOf(id);
+    if (idx === -1) list.push(id); else list.splice(idx, 1);
+    state.starredByFeis[state.feisId] = list;
+    store.set('starredByFeis', state.starredByFeis);
+  }
+
+  // ---------- Loading ----------
+  async function loadFeiseanna() {
+    try {
+      const rows = await api('/feiseanna?include_past=true');
+      state.feiseanna = rows.map(r => r.feis).filter(Boolean).map(f => ({
+        id: f.id, name: f.name, tz: f.tz, status: f.status,
+        loc_name: f.loc_name, loc_addr: f.loc_addr,
+        dt_start: f.dt_start, dt_end: f.dt_end,
+      }));
+      store.set('feiseannaCache', state.feiseanna);
+      state.error = null;
+    } catch (e) {
+      state.error = "Couldn't reach iFeis. Showing the last saved list.";
+    }
+    render();
+  }
+
+  async function loadEvents(feisId) {
+    if (!feisId) return;
+    try {
+      const rows = await api('/feiseanna/' + encodeURIComponent(feisId) + '/events');
+      state.events[feisId] = rows.map(prepEvent);
+      state.eventsUpdatedAt[feisId] = Date.now();
+      store.set('eventsCache', { feisId, at: Date.now(), events: rows });
+      state.error = null;
+    } catch (e) {
+      state.error = "Couldn't reach iFeis. Showing the last update.";
+    }
+    if (feisId === state.feisId) render();
+  }
+
+  async function loadDancers(ev) {
+    try {
+      const rows = await api('/feiseanna/' + encodeURIComponent(state.feisId) + '/events/' + encodeURIComponent(ev.id) + '/placements');
+      state.dancers[ev.id] = rows.map(cleanDancer);
+      state.error = null;
+    } catch (e) {
+      state.error = "Couldn't load dancers from iFeis.";
+      if (!state.dancers[ev.id]) state.dancers[ev.id] = null;
+    }
+    if (state.view === 'detail' && state.detailEventId === ev.id) render();
+  }
+
+  function refreshCurrent() {
+    if (document.hidden) return;
+    if (state.view === 'picker') return loadFeiseanna();
+    loadEvents(state.feisId);
+    if (state.view === 'detail') {
+      const ev = currentEvents().find(e => e.id === state.detailEventId);
+      if (ev) loadDancers(ev);
+    }
+  }
+  setInterval(refreshCurrent, REFRESH_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCurrent(); });
+
+  // ---------- Formatting ----------
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function dateLabel(f) {
+    if (!f.dt_start) return '';
+    const opts = { weekday: 'short', month: 'short', day: 'numeric', timeZone: f.tz || undefined };
+    let fmt;
+    try { fmt = new Intl.DateTimeFormat('en-US', opts); }
+    catch (e) { delete opts.timeZone; fmt = new Intl.DateTimeFormat('en-US', opts); }
+    const a = fmt.format(new Date(f.dt_start));
+    const b = f.dt_end ? fmt.format(new Date(f.dt_end)) : a;
+    return a === b ? a : a + ' – ' + b;
+  }
+
+  function updatedLabel(ms) {
+    if (!ms) return '';
+    const mins = Math.round((Date.now() - ms) / 60000);
+    return mins < 1 ? 'Updated just now' : 'Updated ' + mins + ' min ago';
+  }
+
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
 
   // ---------- Rendering ----------
   const $ = (sel) => document.querySelector(sel);
@@ -554,24 +696,31 @@
     else if (state.view === 'dashboard') showView('picker');
   }
 
-  function currentFeis() { return FEISEANNA.find(f => f.id === state.feisId); }
-  function currentEvents() { return EVENTS[state.feisId] || []; }
+  function currentFeis() { return state.feiseanna.find(f => f.id === state.feisId); }
+  function currentEvents() { return state.events[state.feisId] || []; }
 
-  function statusPillHTML(status) {
-    return '<span class="status-pill status-' + status + '">' + STATUS_LABEL[status] + '</span>';
+  function renderNotice() {
+    document.querySelectorAll('.error-note').forEach(el => {
+      el.textContent = state.error || '';
+      el.style.display = state.error ? 'block' : 'none';
+    });
+  }
+
+  function statusPillHTML(ev) {
+    return '<span class="status-pill status-' + ev._status + '">' + esc(statusLabel(ev)) + '</span>';
   }
 
   function compCardHTML(ev, starred) {
     return (
-      '<div class="comp-card" data-open-event="' + ev.id + '">' +
-        '<div class="comp-num">' + ev.name + '</div>' +
+      '<div class="comp-card" data-open-event="' + esc(ev.id) + '">' +
+        '<div class="comp-num">' + esc(ev.name) + '</div>' +
         '<div class="comp-info">' +
-          '<p class="comp-title">' + ev.age + ' ' + ev.gender + ' ' + ev.event + '</p>' +
-          '<p class="comp-sub">' + ev.level + ' · ' + ev.participants + ' dancers</p>' +
+          '<p class="comp-title">' + esc(ev._title) + '</p>' +
+          '<p class="comp-sub">' + esc(ev.participants) + ' dancers' + (ev.level ? ' · ' + esc(ev.level) : '') + '</p>' +
         '</div>' +
         '<div class="comp-card-tail">' +
-          statusPillHTML(ev.status) +
-          '<button class="star-btn' + (starred ? ' active' : '') + '" data-star="' + ev.id + '" aria-label="Star">' +
+          statusPillHTML(ev) +
+          '<button class="star-btn' + (starred ? ' active' : '') + '" data-star="' + esc(ev.id) + '" aria-label="Star">' +
             '<svg viewBox="0 0 24 24" fill="' + (starred ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.8"><path d="M12 2.5l3.09 6.26 6.91 1-5 4.87 1.18 6.88L12 18.27l-6.18 3.25L7 14.63l-5-4.87 6.91-1L12 2.5z"/></svg>' +
           '</button>' +
         '</div>' +
@@ -579,74 +728,126 @@
     );
   }
 
+  function feisCardHTML(f) {
+    const selected = f.id === state.feisId;
+    return (
+      '<div class="feis-card' + (selected ? ' selected' : '') + '" data-select-feis="' + esc(f.id) + '">' +
+        '<p class="name hero-font">' + esc(f.name) + '</p>' +
+        '<div class="meta"><span>' + esc(dateLabel(f)) + '</span>' + (f.loc_name ? '<span>·</span><span>' + esc(f.loc_name) + '</span>' : '') + '</div>' +
+        (selected ? '<span class="badge-selected">Currently tracking</span>' : '') +
+      '</div>'
+    );
+  }
+
   function renderPicker() {
     $('#hdrTitle').textContent = 'Choose a feis';
     $('#hdrEyebrow').textContent = 'Feis Day';
-    const list = FEISEANNA.map(f => {
-      const selected = f.id === state.feisId;
-      return (
-        '<div class="feis-card' + (selected ? ' selected' : '') + '" data-select-feis="' + f.id + '">' +
-          '<p class="name hero-font">' + f.name + '</p>' +
-          '<div class="meta"><span>' + f.dateLabel + '</span><span>·</span><span>' + f.loc_name + '</span></div>' +
-          (selected ? '<span class="badge-selected">Currently tracking</span>' : '') +
-        '</div>'
-      );
-    }).join('');
-    $('#feisList').innerHTML = list;
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    const all = state.feiseanna.filter(f => f.dt_start);
+    const upcoming = all.filter(f => (f.dt_end || f.dt_start) >= now - DAY / 2)
+      .sort((a, b) => a.dt_start - b.dt_start);
+    const recent = all.filter(f => (f.dt_end || f.dt_start) < now - DAY / 2 && f.dt_start > now - 21 * DAY)
+      .sort((a, b) => b.dt_start - a.dt_start);
+
+    $('#feisList').innerHTML = upcoming.map(feisCardHTML).join('') ||
+      (state.feiseanna.length ? '<div class="empty">No upcoming feiseanna listed yet.</div>' : '<div class="empty">Loading feiseanna…</div>');
+    $('#recentLabel').style.display = recent.length ? 'block' : 'none';
+    $('#recentList').innerHTML = recent.map(feisCardHTML).join('');
   }
 
   function renderDashboard() {
     const feis = currentFeis();
-    $('#hdrEyebrow').textContent = 'Tracking';
+    $('#hdrEyebrow').textContent = feis ? 'Tracking · ' + dateLabel(feis) : 'Tracking';
     $('#hdrTitle').textContent = feis ? feis.name : 'Dashboard';
 
     if (feis) {
-      $('#venueName').textContent = feis.loc_name;
-      $('#venueAddr').textContent = feis.loc_addr;
-      $('#venueCard').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(feis.loc_addr);
+      $('#venueName').textContent = feis.loc_name || 'Venue';
+      $('#venueAddr').textContent = feis.loc_addr || '';
+      $('#venueCard').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([feis.loc_name, feis.loc_addr].filter(Boolean).join(', '));
     }
 
-    const events = currentEvents();
-    const starredEvents = events.filter(e => state.starred.includes(e.id));
+    const loaded = !!state.events[state.feisId];
+    const starred = starredIds();
+    const starredEvents = currentEvents().filter(e => starred.includes(e.id)).sort(byName);
 
-    $('#starredList').innerHTML = starredEvents.map(e => compCardHTML(e, true)).join('');
-    $('#starredEmpty').style.display = starredEvents.length ? 'block' : 'none';
+    $('#starredList').innerHTML = loaded
+      ? starredEvents.map(e => compCardHTML(e, true)).join('')
+      : '<div class="empty">Loading competitions…</div>';
+    $('#starredEmpty').style.display = loaded && !starredEvents.length ? 'block' : 'none';
+    $('#dashUpdated').textContent = updatedLabel(state.eventsUpdatedAt[state.feisId]);
   }
 
   function renderBrowse() {
     const feis = currentFeis();
     $('#hdrEyebrow').textContent = feis ? feis.name : 'Add competitions';
     $('#hdrTitle').textContent = 'Add competitions';
-    const events = currentEvents();
-    $('#browseList').innerHTML = events
-      .map(e => compCardHTML(e, state.starred.includes(e.id)))
-      .join('') || '<div class="empty">No competitions found for this feis.</div>';
+    const starred = starredIds();
+    const q = state.search.trim().toLowerCase();
+    const all = currentEvents().slice().sort(byName);
+    const matches = all.filter(e => !q || (e.name + ' ' + (e.description || '') + ' ' + e._title).toLowerCase().includes(q));
+    // Always show starred ones, even if they have no dancers
+    const shown = matches.filter(e => state.showEmpty || e.participants > 0 || starred.includes(e.id));
+    const hiddenCount = matches.length - shown.length;
+
+    const loaded = !!state.events[state.feisId];
+    $('#browseList').innerHTML = !loaded
+      ? '<div class="empty">Loading competitions…</div>'
+      : shown.map(e => compCardHTML(e, starred.includes(e.id))).join('') ||
+        '<div class="empty">' + (q ? 'No competitions match “' + esc(state.search) + '”.' : 'No competitions found for this feis.') + '</div>';
+
+    const toggle = $('#showEmptyBtn');
+    if (state.showEmpty) {
+      toggle.style.display = 'block';
+      toggle.textContent = 'Hide competitions with no dancers';
+    } else {
+      toggle.style.display = hiddenCount ? 'block' : 'none';
+      toggle.textContent = 'Show ' + hiddenCount + ' competition' + (hiddenCount === 1 ? '' : 's') + ' with no dancers';
+    }
   }
 
   function renderDetail() {
-    const events = currentEvents();
-    const ev = events.find(e => e.id === state.detailEventId);
+    const ev = currentEvents().find(e => e.id === state.detailEventId);
     if (!ev) { showView('dashboard'); return; }
     $('#hdrEyebrow').textContent = ev.name;
-    $('#hdrTitle').textContent = ev.age + ' ' + ev.gender + ' ' + ev.event;
+    $('#hdrTitle').textContent = ev._title;
 
-    const band = $('#detailBand');
-    band.className = 'detail-status-band band-' + ev.status;
-    $('#detailLabel').textContent = ev.level + ' · ' + ev.participants + ' dancers';
-    $('#detailValue').textContent = STATUS_LABEL[ev.status];
+    $('#detailBand').className = 'detail-status-band band-' + ev._status;
+    $('#detailLabel').textContent = [ev.level, ev.participants + ' dancers', ev.awardType].filter(Boolean).join(' · ');
+    $('#detailValue').textContent = statusLabel(ev);
+    $('#detailCode').textContent = 'iFeis status: ' + (ev.status || '—');
 
-    const hasResults = ev.status === 'RES';
+    const dancers = state.dancers[ev.id];
+    if (dancers === undefined) {
+      $('#dancerListLabel').textContent = 'Dancers';
+      $('#dancerList').innerHTML = '<div class="empty">Loading dancers…</div>';
+      return;
+    }
+    if (dancers === null || !dancers.length) {
+      $('#dancerListLabel').textContent = 'Dancers';
+      $('#dancerList').innerHTML = '<div class="empty">' + (dancers === null ? "Couldn't load dancers." : 'iFeis hasn’t published the dancer list for this competition yet.') + '</div>';
+      return;
+    }
+
+    const hasResults = dancers.some(d => d.score && d.score.placement);
+    const list = dancers.slice();
+    if (hasResults) {
+      list.sort((a, b) => ((a.score && a.score.placement) || 9999) - ((b.score && b.score.placement) || 9999));
+    } else {
+      list.sort((a, b) => a.lname.localeCompare(b.lname) || a.fname.localeCompare(b.fname));
+    }
     $('#dancerListLabel').textContent = hasResults ? 'Results' : 'Dancers (alphabetical)';
-    const dancers = makeDancers(ev.id, Math.min(ev.participants, 10), hasResults);
-    $('#dancerList').innerHTML = dancers.map(d => {
+    $('#dancerList').innerHTML = list.map(d => {
+      const place = d.score && d.score.placement;
       const chip = hasResults
-        ? '<div class="placement-chip' + (d.score.placement <= 3 ? ' top3' : '') + '">' + d.score.placement + '</div>'
-        : '<div class="placement-chip">' + d.competitor + '</div>';
+        ? '<div class="placement-chip' + (place && place <= 3 ? ' top3' : '') + '">' + esc(place || '–') + '</div>'
+        : '<div class="placement-chip">' + esc(d.competitor || '–') + '</div>';
+      const checkedIn = !hasResults && d.score && d.score.checkedIn ? ' · <span class="checked-in">Checked in</span>' : '';
       return (
         '<div class="dancer-row">' + chip +
           '<div style="flex:1;">' +
-            '<div class="dancer-name">' + d.fname + ' ' + d.lname + '</div>' +
-            '<div class="dancer-school">' + d.school + '</div>' +
+            '<div class="dancer-name">' + esc(d.fname + ' ' + d.lname) + '</div>' +
+            '<div class="dancer-school">' + esc(d.school) + checkedIn + '</div>' +
           '</div>' +
         '</div>'
       );
@@ -661,6 +862,7 @@
   }
 
   function render() {
+    renderNotice();
     if (state.view === 'picker') renderPicker();
     else if (state.view === 'dashboard') renderDashboard();
     else if (state.view === 'browse') renderBrowse();
@@ -672,18 +874,17 @@
   document.body.addEventListener('click', function(e) {
     const feisEl = e.target.closest('[data-select-feis]');
     if (feisEl) {
-      state.feisId = feisEl.getAttribute('data-select-feis');
+      const id = feisEl.getAttribute('data-select-feis');
+      if (id !== state.feisId) { state.feisId = id; state.search = ''; state.showEmpty = false; }
       store.set('feisId', state.feisId);
       showView('dashboard');
+      loadEvents(state.feisId);
       return;
     }
     const starEl = e.target.closest('[data-star]');
     if (starEl) {
       e.stopPropagation();
-      const id = starEl.getAttribute('data-star');
-      const idx = state.starred.indexOf(id);
-      if (idx === -1) state.starred.push(id); else state.starred.splice(idx, 1);
-      saveStarred();
+      toggleStar(starEl.getAttribute('data-star'));
       render();
       return;
     }
@@ -691,6 +892,8 @@
     if (openEl) {
       state.detailEventId = openEl.getAttribute('data-open-event');
       showView('detail');
+      const ev = currentEvents().find(x => x.id === state.detailEventId);
+      if (ev) loadDancers(ev);
       return;
     }
   });
@@ -699,7 +902,10 @@
   $('#addCompBtn').addEventListener('click', () => showView('browse'));
   $('#emptyAddBtn').addEventListener('click', () => showView('browse'));
   $('#headerBackBtn').addEventListener('click', goBack);
-  $('#changeFeisBtn').addEventListener('click', () => showView('picker'));
+  $('#changeFeisBtn').addEventListener('click', () => { showView('picker'); loadFeiseanna(); });
+  $('#dashUpdated').addEventListener('click', () => loadEvents(state.feisId));
+  $('#searchInput').addEventListener('input', (e) => { state.search = e.target.value; renderBrowse(); });
+  $('#showEmptyBtn').addEventListener('click', () => { state.showEmpty = !state.showEmpty; renderBrowse(); });
 
   ['notifyCI','notifyRes'].forEach(id => {
     const el = document.getElementById(id);
@@ -709,6 +915,8 @@
 
   // ---------- Init ----------
   showView(state.feisId ? 'dashboard' : 'picker');
+  loadFeiseanna();
+  if (state.feisId) loadEvents(state.feisId);
 })();
 </script>
 </body>
