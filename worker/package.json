@@ -1,0 +1,11 @@
+{
+  "name": "feis-day-worker",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --test-scheduled"
+  },
+  "devDependencies": {
+    "wrangler": "^4.142.0"
+  }
+}

@@ -4,3 +4,5 @@
 node_modules/
 .wrangler/
 .claude/settings.local.json
+.secrets/
+.dev.vars

@@ -1,0 +1,8 @@
+name = "feis-day"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[triggers]
+crons = ["*/2 * * * *"]
+
+# KV namespace id is filled in after `wrangler kv namespace create FEIS_KV`

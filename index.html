@@ -374,6 +374,20 @@
   .checked-in { color: var(--status-ci); }
   .code-note { font-size: 11px; color: var(--text-faint); margin: 18px 4px 0; }
 
+  .pill-btn {
+    flex-shrink: 0;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-family: 'Archivo', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .topic-name { color: var(--text); font-variant-numeric: tabular-nums; word-break: break-all; }
+
   ::selection { background: var(--accent-soft); }
 </style>
 </head>
@@ -473,7 +487,7 @@
       <div class="settings-row">
         <div>
           <div class="label">Checking-in alerts</div>
-          <div class="sub">For starred competitions · coming soon</div>
+          <div class="sub">For starred competitions</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="notifyCI" checked>
@@ -483,7 +497,7 @@
       <div class="settings-row">
         <div>
           <div class="label">Results alerts</div>
-          <div class="sub">For starred competitions · coming soon</div>
+          <div class="sub">For starred competitions</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="notifyRes" checked>
@@ -491,10 +505,25 @@
         </label>
       </div>
 
+      <div class="settings-row">
+        <div style="min-width:0;">
+          <div class="label">Alert status</div>
+          <div class="sub" id="alertStatus">Checking…</div>
+        </div>
+        <button class="pill-btn" id="testAlertBtn" style="display:none;">Send test</button>
+      </div>
+      <div class="settings-row" id="topicRow" style="display:none;">
+        <div style="min-width:0;">
+          <div class="label">ntfy topic</div>
+          <div class="sub">Subscribe to this in the ntfy app: <span id="topicName" class="topic-name"></span></div>
+        </div>
+        <button class="pill-btn" id="copyTopicBtn">Copy</button>
+      </div>
+
       <p class="section-label">About</p>
       <div class="proto-note" style="margin-bottom:0;">
         <span>●</span>
-        <span>Live data comes straight from iFeis and refreshes every minute while the app is open. Push alerts are the next build step.</span>
+        <span>Live data comes straight from iFeis and refreshes every minute while the app is open. Alerts come from a small checker on Cloudflare that looks at iFeis every 2 minutes during the feis you're tracking.</span>
       </div>
     </section>
 
@@ -507,6 +536,16 @@
   // ---------- iFeis API (public endpoints, no auth) ----------
   const API = 'https://api.ifeis.net/api';
   const REFRESH_MS = 60 * 1000;   // go easy: one refresh a minute while the app is open
+
+  // Alert checker (Cloudflare Worker, see worker/). Its key is set on this phone once by opening
+  // the private setup link (…/feis-tracker/#key=…); it's saved on the phone and never in this file.
+  const ALERTS_API = '';
+  (function readSetupLink() {
+    const m = location.hash.match(/key=([A-Za-z0-9_-]+)/);
+    if (!m) return;
+    try { localStorage.setItem('syncKey', JSON.stringify(m[1])); } catch (e) {}
+    history.replaceState(null, '', location.pathname + location.search);
+  })();
 
   async function api(path) {
     const res = await fetch(API + path, { headers: { Accept: 'application/json' } });
@@ -580,6 +619,8 @@
     search: '',
     showEmpty: false,
     error: null,
+    syncKey: store.get('syncKey', null),
+    alerts: { status: 'idle', topic: null, health: null },
   };
   const cachedEvents = store.get('eventsCache', null);
   if (cachedEvents && cachedEvents.feisId === state.feisId) {
@@ -594,6 +635,56 @@
     if (idx === -1) list.push(id); else list.splice(idx, 1);
     state.starredByFeis[state.feisId] = list;
     store.set('starredByFeis', state.starredByFeis);
+    syncWatch();
+  }
+
+  // ---------- Alert checker sync ----------
+  function alertsReady() { return !!(ALERTS_API && state.syncKey); }
+
+  async function alertsApi(method, path, body) {
+    const res = await fetch(ALERTS_API + path, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-Feis-Key': state.syncKey },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) throw new Error('Alert checker returned ' + res.status);
+    return res.json();
+  }
+
+  let syncTimer = null;
+  function syncWatch() {
+    if (!alertsReady() || !state.feisId || !currentFeis()) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(async () => {
+      const feis = currentFeis() || {};
+      try {
+        await alertsApi('PUT', '/watch', {
+          feisId: state.feisId,
+          feisName: feis.name,
+          dt_start: feis.dt_start,
+          dt_end: feis.dt_end,
+          eventIds: starredIds(),
+          alerts: { ci: store.get('notifyCI', true), res: store.get('notifyRes', true) },
+        });
+        state.alerts.status = 'synced';
+      } catch (e) {
+        state.alerts.status = 'error';
+      }
+      if (state.view === 'settings') renderSettings();
+    }, 800);
+  }
+
+  async function loadAlertInfo() {
+    if (!alertsReady()) return;
+    try {
+      const info = await alertsApi('GET', '/watch');
+      state.alerts.topic = info.topic;
+      state.alerts.health = info.health || {};
+      if (state.alerts.status === 'idle') state.alerts.status = 'synced';
+    } catch (e) {
+      state.alerts.status = 'error';
+    }
+    if (state.view === 'settings') renderSettings();
   }
 
   // ---------- Loading ----------
@@ -607,6 +698,7 @@
       }));
       store.set('feiseannaCache', state.feiseanna);
       state.error = null;
+      if (state.alerts.status !== 'synced') syncWatch();  // needs the feis dates, which arrive here
     } catch (e) {
       state.error = "Couldn't reach iFeis. Showing the last saved list.";
     }
@@ -859,6 +951,23 @@
     $('#hdrTitle').textContent = 'Settings';
     const feis = currentFeis();
     $('#settingsFeisName').textContent = feis ? feis.name : 'No feis selected';
+
+    const a = state.alerts;
+    let text;
+    if (!ALERTS_API) text = 'Alert checker not set up yet.';
+    else if (!state.syncKey) text = 'Not set up on this phone. Open your private setup link once.';
+    else if (a.status === 'error') text = "Couldn't reach the alert checker. Your stars will sync next time.";
+    else {
+      const n = starredIds().length;
+      text = n ? 'On for ' + n + ' starred competition' + (n === 1 ? '' : 's') + '.' : 'On. Star competitions to get alerts.';
+      const h = a.health || {};
+      if (h.lastError) text += ' Last check failed: ' + h.lastError + '.';
+      else if (h.lastOkAt) text += ' Last checked iFeis ' + updatedLabel(h.lastOkAt).replace('Updated ', '') + '.';
+    }
+    $('#alertStatus').textContent = text;
+    $('#testAlertBtn').style.display = alertsReady() ? 'block' : 'none';
+    $('#topicRow').style.display = a.topic ? 'flex' : 'none';
+    $('#topicName').textContent = a.topic || '';
   }
 
   function render() {
@@ -879,6 +988,7 @@
       store.set('feisId', state.feisId);
       showView('dashboard');
       loadEvents(state.feisId);
+      syncWatch();
       return;
     }
     const starEl = e.target.closest('[data-star]');
@@ -898,7 +1008,20 @@
     }
   });
 
-  $('#settingsBtn').addEventListener('click', () => showView('settings'));
+  $('#settingsBtn').addEventListener('click', () => { showView('settings'); loadAlertInfo(); });
+  $('#testAlertBtn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.textContent = 'Sending…';
+    try { await alertsApi('POST', '/test'); btn.textContent = 'Sent ✓'; }
+    catch (err) { btn.textContent = 'Failed'; }
+    setTimeout(() => { btn.textContent = 'Send test'; }, 3000);
+  });
+  $('#copyTopicBtn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    try { await navigator.clipboard.writeText(state.alerts.topic); btn.textContent = 'Copied ✓'; }
+    catch (err) { btn.textContent = 'Copy failed'; }
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  });
   $('#addCompBtn').addEventListener('click', () => showView('browse'));
   $('#emptyAddBtn').addEventListener('click', () => showView('browse'));
   $('#headerBackBtn').addEventListener('click', goBack);
@@ -910,13 +1033,14 @@
   ['notifyCI','notifyRes'].forEach(id => {
     const el = document.getElementById(id);
     el.checked = store.get(id, true);
-    el.addEventListener('change', () => store.set(id, el.checked));
+    el.addEventListener('change', () => { store.set(id, el.checked); syncWatch(); });
   });
 
   // ---------- Init ----------
   showView(state.feisId ? 'dashboard' : 'picker');
   loadFeiseanna();
   if (state.feisId) loadEvents(state.feisId);
+  syncWatch();
 })();
 </script>
 </body>
