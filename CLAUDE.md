@@ -20,7 +20,7 @@ Full background, API notes and design decisions: `docs/project-brief.md`. This f
   Cloudflare dashboard). Never print or commit them.
 
 ## Decisions made (2026-09-27)
-- **Public repo + GitHub Pages** for the front end. Secrets (iFeis JWT, ntfy topic name) must never be committed — they go in the backend's encrypted secrets.
+- **Public repo + GitHub Pages** for the front end. Secrets (iFeis JWT, Pushover keys, app sync key) must never be committed — they go in the backend's encrypted secrets.
 - **Alerts backend: Cloudflare Workers cron**, not GitHub Actions — timing matters and Actions schedules can run 10–30+ min late. Fallback if iFeis blocks Cloudflare: a Raspberry Pi at home. Polling from the user's laptop was rejected (too much running around at a feis).
 - **Notifications: Pushover** app on the user's phone. (ntfy.sh was tried first and dropped: its free tier rate-limits per IP, and Cloudflare Worker IPs are shared, so publishes got `429 daily message quota reached` even with a free ntfy account token — per-user limits need a paid ntfy plan.)
 - **Privacy:** drop `dob` on fetch; never store or display it. Dancer lists are kept in memory only, not localStorage.
