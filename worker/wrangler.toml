@@ -5,4 +5,6 @@ compatibility_date = "2026-09-01"
 [triggers]
 crons = ["*/2 * * * *"]
 
-# KV namespace id is filled in after `wrangler kv namespace create FEIS_KV`
+[[kv_namespaces]]
+binding = "FEIS_KV"
+id = "a841d0d525514933955f03875afedecb"

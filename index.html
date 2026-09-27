@@ -520,6 +520,14 @@
         <button class="pill-btn" id="copyTopicBtn">Copy</button>
       </div>
 
+      <div class="settings-row" id="pasteKeyRow" style="display:none;">
+        <div style="min-width:0;">
+          <div class="label">Set up alerts on this phone</div>
+          <div class="sub">Copy the setup code from your private setup link, then tap Paste.</div>
+        </div>
+        <button class="pill-btn" id="pasteKeyBtn">Paste</button>
+      </div>
+
       <p class="section-label">About</p>
       <div class="proto-note" style="margin-bottom:0;">
         <span>●</span>
@@ -539,13 +547,18 @@
 
   // Alert checker (Cloudflare Worker, see worker/). Its key is set on this phone once by opening
   // the private setup link (…/feis-tracker/#key=…); it's saved on the phone and never in this file.
-  const ALERTS_API = '';
+  const ALERTS_API = 'https://feis-day.feis-day-worker.workers.dev';
+  // A Home Screen app has its own storage, separate from Safari, so when the link opens in Safari
+  // we also offer to copy the key for pasting into the Home Screen app's Settings.
+  let setupKeyFromLink = null;
   (function readSetupLink() {
     const m = location.hash.match(/key=([A-Za-z0-9_-]+)/);
     if (!m) return;
+    setupKeyFromLink = m[1];
     try { localStorage.setItem('syncKey', JSON.stringify(m[1])); } catch (e) {}
     history.replaceState(null, '', location.pathname + location.search);
   })();
+  const isHomeScreenApp = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
   async function api(path) {
     const res = await fetch(API + path, { headers: { Accept: 'application/json' } });
@@ -647,6 +660,7 @@
       headers: { 'Content-Type': 'application/json', 'X-Feis-Key': state.syncKey },
       body: body ? JSON.stringify(body) : undefined,
     });
+    if (res.status === 401) { state.alerts.status = 'badkey'; throw new Error('bad key'); }
     if (!res.ok) throw new Error('Alert checker returned ' + res.status);
     return res.json();
   }
@@ -668,7 +682,7 @@
         });
         state.alerts.status = 'synced';
       } catch (e) {
-        state.alerts.status = 'error';
+        if (state.alerts.status !== 'badkey') state.alerts.status = 'error';
       }
       if (state.view === 'settings') renderSettings();
     }, 800);
@@ -682,7 +696,7 @@
       state.alerts.health = info.health || {};
       if (state.alerts.status === 'idle') state.alerts.status = 'synced';
     } catch (e) {
-      state.alerts.status = 'error';
+      if (state.alerts.status !== 'badkey') state.alerts.status = 'error';
     }
     if (state.view === 'settings') renderSettings();
   }
@@ -956,6 +970,7 @@
     let text;
     if (!ALERTS_API) text = 'Alert checker not set up yet.';
     else if (!state.syncKey) text = 'Not set up on this phone. Open your private setup link once.';
+    else if (a.status === 'badkey') text = "This phone's setup code wasn't accepted. Paste it again below.";
     else if (a.status === 'error') text = "Couldn't reach the alert checker. Your stars will sync next time.";
     else {
       const n = starredIds().length;
@@ -965,7 +980,8 @@
       else if (h.lastOkAt) text += ' Last checked iFeis ' + updatedLabel(h.lastOkAt).replace('Updated ', '') + '.';
     }
     $('#alertStatus').textContent = text;
-    $('#testAlertBtn').style.display = alertsReady() ? 'block' : 'none';
+    $('#testAlertBtn').style.display = alertsReady() && a.status !== 'badkey' ? 'block' : 'none';
+    $('#pasteKeyRow').style.display = ALERTS_API && (!state.syncKey || a.status === 'badkey') ? 'flex' : 'none';
     $('#topicRow').style.display = a.topic ? 'flex' : 'none';
     $('#topicName').textContent = a.topic || '';
   }
@@ -1016,6 +1032,20 @@
     catch (err) { btn.textContent = 'Failed'; }
     setTimeout(() => { btn.textContent = 'Send test'; }, 3000);
   });
+  $('#pasteKeyBtn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    let text = '';
+    try { text = await navigator.clipboard.readText(); } catch (err) {}
+    if (!text) text = window.prompt('Paste your setup code') || '';
+    const m = text.trim().match(/(?:key=)?([A-Za-z0-9_-]{30,})\s*$/);
+    if (!m) { btn.textContent = 'Not a setup code'; setTimeout(() => { btn.textContent = 'Paste'; }, 2500); return; }
+    state.syncKey = m[1];
+    store.set('syncKey', state.syncKey);
+    state.alerts.status = 'idle';
+    syncWatch();
+    loadAlertInfo();
+    renderSettings();
+  });
   $('#copyTopicBtn').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     try { await navigator.clipboard.writeText(state.alerts.topic); btn.textContent = 'Copied ✓'; }
@@ -1035,6 +1065,17 @@
     el.checked = store.get(id, true);
     el.addEventListener('change', () => { store.set(id, el.checked); syncWatch(); });
   });
+
+  if (setupKeyFromLink && !isHomeScreenApp) {
+    const note = document.createElement('div');
+    note.className = 'proto-note';
+    note.innerHTML = '<span>●</span><span><strong>Alerts are set up in Safari.</strong> If you use the Feis Day icon on your Home Screen, tap Copy, then open the app → Settings → <em>Paste</em>. <button class="pill-btn" id="copySetupBtn" style="margin-top:10px; display:block;">Copy setup code</button></span>';
+    document.querySelector('main').prepend(note);
+    document.getElementById('copySetupBtn').addEventListener('click', async (e) => {
+      try { await navigator.clipboard.writeText(setupKeyFromLink); e.currentTarget.textContent = 'Copied ✓'; }
+      catch (err) { window.prompt('Copy this setup code', setupKeyFromLink); }
+    });
+  }
 
   // ---------- Init ----------
   showView(state.feisId ? 'dashboard' : 'picker');
