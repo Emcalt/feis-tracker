@@ -47,5 +47,5 @@ Full background, API notes and design decisions: `docs/project-brief.md`. This f
 ## Status / next steps
 1. ✅ Front end reads live iFeis data (feis picker, starred comps per feis, search, dancer/results view, refresh every 60s while open).
 2. ⏭ At the next live feis (~Oct 17–18, 2026): confirm status flags during check-in/dancing/tabulation, and when the dancer list appears.
-3. ✅ Cloudflare Worker deployed and wired to the app (2026-09-27). Setup code pasted on the phone. Pending: user adds Pushover keys in Cloudflare, then Send test.
+3. ✅ Cloudflare Worker deployed and wired to the app (2026-09-27). Fully set up: phone has the setup code, Pushover keys are in Cloudflare, test alerts confirmed on the phone.
 4. Open decision: manual feis/competition watch list vs. `/mine` + stored JWT.
