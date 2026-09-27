@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Feis Day</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Archivo:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12141C;
+    --surface: #1B1E29;
+    --surface-2: #212430;
+    --surface-raised: #232735;
+    --border: #2A2E3D;
+    --border-soft: #23273400;
+    --text: #EDEAE3;
+    --text-dim: #9297AC;
+    --text-faint: #666B80;
+    --accent: #C9A24B;
+    --accent-soft: rgba(201,162,75,0.14);
+    --danger: #C9604B;
+
+    --status-pnd: #4A4E5C;
+    --status-ci: #4FB6A8;
+    --status-dancing: #E0973C;
+    --status-tab: #8B7FD1;
+    --status-qa: #6B8CBE;
+    --status-res: #C9A24B;
+
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  * { box-sizing: inherit; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Archivo', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { max-width: 560px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; }
+
+  .hero-font { font-family: 'Fraunces', Georgia, serif; }
+
+  /* ---- Top bar ---- */
+  header.topbar {
+    position: sticky;
+    top: 0;
+    padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 14px;
+    background: linear-gradient(var(--bg) 80%, transparent);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .topbar .titles { min-width: 0; flex: 1; }
+  .topbar .eyebrow { font-size: 12px; color: var(--text-faint); margin: 0 0 2px; }
+  .topbar h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 21px;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .icon-btn {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .icon-btn:active { background: var(--surface-raised); }
+  .icon-btn svg { width: 19px; height: 19px; }
+
+  main { flex: 1; padding: 4px 20px 40px; }
+
+  /* ---- Prototype notice ---- */
+  .proto-note {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    margin-bottom: 22px;
+  }
+  .proto-note strong { color: var(--text); }
+
+  /* ---- Section labels ---- */
+  .section-label {
+    font-size: 13px;
+    color: var(--text-faint);
+    margin: 28px 0 10px;
+  }
+  .section-label:first-of-type { margin-top: 4px; }
+
+  /* ---- Feis picker cards ---- */
+  .feis-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 18px;
+    margin-bottom: 12px;
+    cursor: pointer;
+  }
+  .feis-card:active { background: var(--surface-raised); }
+  .feis-card .name {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 19px;
+    font-weight: 500;
+    margin: 0 0 6px;
+  }
+  .feis-card .meta {
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+  .feis-card.selected { border-color: var(--accent); }
+  .feis-card .badge-selected {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 2px 9px;
+    margin-top: 8px;
+  }
+
+  /* ---- Competition cards ---- */
+  .comp-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+  }
+  .comp-card:active { background: var(--surface-raised); }
+  .comp-num {
+    font-family: 'Archivo', sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    font-size: 17px;
+    color: var(--text);
+    background: var(--surface-raised);
+    border-radius: 10px;
+    padding: 8px 10px;
+    min-width: 58px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .comp-info { flex: 1; min-width: 0; }
+  .comp-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .comp-sub {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin: 0;
+  }
+  .star-btn {
+    flex-shrink: 0;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-faint);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+  }
+  .star-btn.active { color: var(--accent); }
+  .star-btn svg { width: 20px; height: 20px; }
+
+  .status-pill {
+    flex-shrink: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .status-PND  { background: rgba(74,78,92,0.25);   color: #A7ABBB; }
+  .status-CI   { background: rgba(79,182,168,0.16);  color: var(--status-ci); }
+  .status-DANCING { background: rgba(224,151,60,0.16); color: var(--status-dancing); }
+  .status-TAB  { background: rgba(139,127,209,0.18); color: var(--status-tab); }
+  .status-QA   { background: rgba(107,140,190,0.18); color: var(--status-qa); }
+  .status-RES  { background: rgba(201,162,75,0.18);  color: var(--status-res); }
+
+  .comp-card-tail { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+
+  /* ---- Empty state ---- */
+  .empty {
+    text-align: center;
+    padding: 36px 18px;
+    color: var(--text-dim);
+    font-size: 14px;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    line-height: 1.6;
+  }
+
+  /* ---- Collapsible ---- */
+  .browse-toggle {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'Archivo', sans-serif;
+    font-size: 13px;
+    padding: 6px 2px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .browse-toggle svg { width: 14px; height: 14px; transition: transform .2s; }
+  .browse-toggle.open svg { transform: rotate(90deg); }
+
+  /* ---- Detail view ---- */
+  .detail-status-band {
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+  }
+  .detail-status-band .label { font-size: 12px; opacity: .85; margin: 0 0 4px; }
+  .detail-status-band .value { font-family: 'Fraunces', Georgia, serif; font-size: 20px; font-weight: 600; margin: 0; }
+  .band-PND { background: rgba(74,78,92,0.25); color: #C6C9D6; }
+  .band-CI { background: rgba(79,182,168,0.16); color: var(--status-ci); }
+  .band-DANCING { background: rgba(224,151,60,0.16); color: var(--status-dancing); }
+  .band-TAB { background: rgba(139,127,209,0.18); color: var(--status-tab); }
+  .band-QA { background: rgba(107,140,190,0.18); color: var(--status-qa); }
+  .band-RES { background: rgba(201,162,75,0.18); color: var(--status-res); }
+
+  .dancer-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .dancer-row:last-child { border-bottom: none; }
+  .placement-chip {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 9px;
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    font-weight: 700;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .placement-chip.top3 { background: var(--accent-soft); color: var(--accent); }
+  .dancer-name { flex: 1; font-size: 14.5px; }
+  .dancer-school { font-size: 12px; color: var(--text-faint); }
+
+  /* ---- Settings ---- */
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row .label { font-size: 14.5px; }
+  .settings-row .sub { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+
+  .switch {
+    position: relative;
+    width: 46px; height: 27px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .track {
+    position: absolute; inset: 0;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    transition: background .15s;
+    cursor: pointer;
+  }
+  .switch .thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 19px; height: 19px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    transition: transform .15s, background .15s;
+  }
+  .switch input:checked + .track { background: var(--accent-soft); border-color: var(--accent); }
+  .switch input:checked + .track .thumb { transform: translateX(19px); background: var(--accent); }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+  .back-link svg { width: 15px; height: 15px; }
+
+  [data-view] { display: none; }
+  [data-view].active { display: block; }
+
+  ::selection { background: var(--accent-soft); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <button class="icon-btn" id="headerBackBtn" title="Back" style="display:none; flex-shrink:0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="titles">
+      <p class="eyebrow" id="hdrEyebrow">Feis Day</p>
+      <h1 id="hdrTitle" class="hero-font">Choose a feis</h1>
+    </div>
+    <div style="display:flex; gap:8px; flex-shrink:0;">
+      <button class="icon-btn" id="addCompBtn" title="Add competitions" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="icon-btn" id="settingsBtn" title="Settings" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============ VIEW: FEIS PICKER ============ -->
+    <section data-view="picker" class="active">
+      <div class="proto-note">
+        <span>●</span>
+        <span><strong>Prototype.</strong> Showing sample competitions so we can test the flow. The live iFeis connection comes next, once we've confirmed the full status list at your next feis.</span>
+      </div>
+      <p class="section-label">Upcoming feiseanna</p>
+      <div id="feisList"></div>
+    </section>
+
+    <!-- ============ VIEW: DASHBOARD ============ -->
+    <section data-view="dashboard">
+      <a id="venueCard" href="#" target="_blank" rel="noopener" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:20px;">
+        <div style="flex-shrink:0; width:36px; height:36px; border-radius:10px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; color:var(--accent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <div style="min-width:0;">
+          <div id="venueName" style="font-size:14px; font-weight:600;">—</div>
+          <div id="venueAddr" style="font-size:12.5px; color:var(--text-dim);">—</div>
+        </div>
+      </a>
+      <p class="section-label" style="margin-top:0;">My competitions</p>
+      <div id="starredList"></div>
+      <div id="starredEmpty" class="empty" style="display:none;">
+        Nothing starred yet.<br>Find and star the competitions you're tracking today.
+        <div style="margin-top:14px;">
+          <button id="emptyAddBtn" style="background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:9px 18px; font-family:'Archivo',sans-serif; font-size:13.5px; font-weight:600; cursor:pointer;">
+            + Add competitions
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VIEW: ADD COMPETITIONS (browse full list) ============ -->
+    <section data-view="browse">
+      <p class="section-label">All competitions at this feis</p>
+      <div id="browseList"></div>
+    </section>
+
+    <!-- ============ VIEW: COMPETITION DETAIL ============ -->
+    <section data-view="detail">
+      <div class="detail-status-band" id="detailBand">
+        <p class="label" id="detailLabel">Status</p>
+        <p class="value" id="detailValue">—</p>
+      </div>
+      <p class="section-label" id="dancerListLabel">Dancers</p>
+      <div id="dancerList"></div>
+    </section>
+
+    <!-- ============ VIEW: SETTINGS ============ -->
+    <section data-view="settings">
+      <p class="section-label">Feis</p>
+      <div class="settings-row">
+        <div>
+          <div class="label" id="settingsFeisName">—</div>
+          <div class="sub">Tap to change which feis you're tracking</div>
+        </div>
+        <button class="icon-btn" id="changeFeisBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+
+      <p class="section-label">Notifications</p>
+      <div class="settings-row">
+        <div>
+          <div class="label">Checking-in alerts</div>
+          <div class="sub">For starred competitions · not active in this prototype</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="notifyCI" checked>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="label">Results alerts</div>
+          <div class="sub">For starred competitions · not active in this prototype</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="notifyRes" checked>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
+      <p class="section-label">About this prototype</p>
+      <div class="proto-note" style="margin-bottom:0;">
+        <span>●</span>
+        <span>Live status and push notifications need a small companion service polling iFeis on your behalf — that's the next build step. This screen previews what you'll control once it's wired up.</span>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  // ---------- Mock data, shaped like the real api.ifeis.net responses ----------
+  const FEISEANNA = [
+    { id: 'my9fPLN_Vl', name: 'The Good Life Feis', loc_name: 'Raleigh Convention Center', loc_addr: '500 S Salisbury St, Raleigh, NC 27601', dateLabel: 'Sat, Oct 17' },
+    { id: 'qw8pTZa_Rn', name: 'Carolina Classic Oireachtas', loc_name: 'Greensboro Coliseum', loc_addr: '1921 W Gate City Blvd, Greensboro, NC 27403', dateLabel: 'Sat–Sun, Nov 14–15' },
+    { id: 'zx2mVBc_Ko', name: 'Autumn Leaves Feis', loc_name: 'Charlotte Convention Center', loc_addr: '501 S College St, Charlotte, NC 28202', dateLabel: 'Sun, Dec 6' },
+  ];
+
+  // status codes: PND (not started), CI (checking in), DANCING, TAB (tabulating), QA, RES (results)
+  // NOTE: only PND and RES are confirmed from the real API so far — CI/DANCING/TAB/QA are
+  // placeholders to be confirmed against a live feis, per the investigation notes.
+  const EVENTS = {
+    my9fPLN_Vl: [
+      { id: 'e01', name: '104LJ', event: 'Light Jig', level: 'Beginner', age: 'U8', gender: 'Girls', participants: 12, status: 'RES' },
+      { id: 'e02', name: '112RL', event: 'Reel', level: 'Beginner', age: 'U8', gender: 'Boys', participants: 6, status: 'RES' },
+      { id: 'e03', name: '206LJ', event: 'Light Jig', level: 'Novice', age: 'U10', gender: 'Girls', participants: 24, status: 'QA' },
+      { id: 'e04', name: '207SJ', event: 'Slip Jig', level: 'Novice', age: 'U10', gender: 'Girls', participants: 18, status: 'TAB' },
+      { id: 'e05', name: '214RL', event: 'Reel', level: 'Novice', age: 'U10', gender: 'Boys', participants: 9, status: 'DANCING' },
+      { id: 'e06', name: '308HP', event: 'Hornpipe', level: 'Prizewinner', age: 'U12', gender: 'Girls', participants: 21, status: 'CI' },
+      { id: 'e07', name: '309TR', event: 'Treble Reel', level: 'Prizewinner', age: 'U12', gender: 'Girls', participants: 15, status: 'PND' },
+      { id: 'e08', name: '402LJ', event: 'Light Jig', level: 'Open', age: 'U14', gender: 'Girls', participants: 19, status: 'PND' },
+      { id: 'e09', name: '415RL', event: 'Reel', level: 'Open', age: 'U14', gender: 'Boys', participants: 5, status: 'PND' },
+    ],
+    qw8pTZa_Rn: [
+      { id: 'e21', name: '118RL', event: 'Reel', level: 'Novice', age: 'U9', gender: 'Girls', participants: 22, status: 'PND' },
+      { id: 'e22', name: '204HP', event: 'Hornpipe', level: 'Novice', age: 'U10', gender: 'Girls', participants: 17, status: 'PND' },
+    ],
+    zx2mVBc_Ko: [
+      { id: 'e31', name: '101RL', event: 'Reel', level: 'Beginner', age: 'U7', gender: 'Girls', participants: 10, status: 'PND' },
+    ],
+  };
+
+  function makeDancers(eventId, n, hasResults) {
+    const firstNames = ['Aoife','Maeve','Siobhan','Ciara','Grace','Fiona','Riley','Nora','Ella','Saoirse','Brogan','Kiera','Molly','Tara','Erin','Cara','Niamh','Sadie','Roisin','Delia','Maura','Bridget','Orla','Cliona'];
+    const lastNames = ['Kelly','Byrne','Walsh','Doyle','Murphy','Gallagher','Reilly','Quinn','Casey','Nolan','Sullivan','Fitzgerald','Duffy','Whelan','Brennan'];
+    const schools = ['Ardara Academy','Emerald Isle School','Sheehan-Doyle Irish Dance','Rince na hÉireann','Highland Feis Academy'];
+    const list = [];
+    for (let i = 0; i < n; i++) {
+      const seed = eventId.charCodeAt(2) + i;
+      list.push({
+        id: eventId + '-' + i,
+        fname: firstNames[(seed * 7 + i) % firstNames.length],
+        lname: lastNames[(seed * 3 + i) % lastNames.length],
+        competitor: 1000 + i,
+        school: schools[(seed + i) % schools.length],
+        score: hasResults ? { placement: i + 1, placed: i < 3 } : null,
+      });
+    }
+    if (hasResults) {
+      list.sort((a, b) => a.score.placement - b.score.placement);
+    } else {
+      list.sort((a, b) => a.lname.localeCompare(b.lname));
+    }
+    return list;
+  }
+
+  const STATUS_LABEL = {
+    PND: 'Not started', CI: 'Checking in', DANCING: 'On stage',
+    TAB: 'Tabulating', QA: 'Quality assurance', RES: 'Results posted',
+  };
+
+  // ---------- Local state ----------
+  const store = {
+    get(k, fallback) {
+      try { const v = localStorage.getItem(k); return v === null ? fallback : JSON.parse(v); }
+      catch (e) { return fallback; }
+    },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+
+  let state = {
+    feisId: store.get('feisId', null),
+    starred: store.get('starred', []),
+    view: 'picker',
+    detailEventId: null,
+    browseOpen: false,
+  };
+
+  function saveStarred() { store.set('starred', state.starred); }
+
+  // ---------- Rendering ----------
+  const $ = (sel) => document.querySelector(sel);
+  const views = document.querySelectorAll('[data-view]');
+
+  function showView(name) {
+    state.view = name;
+    views.forEach(v => v.classList.toggle('active', v.dataset.view === name));
+    const isSubView = (name !== 'picker');
+    $('#headerBackBtn').style.display = isSubView ? 'flex' : 'none';
+    $('#settingsBtn').style.display = (name === 'dashboard') ? 'flex' : 'none';
+    $('#addCompBtn').style.display = (name === 'dashboard') ? 'flex' : 'none';
+    window.scrollTo(0, 0);
+    render();
+  }
+
+  function goBack() {
+    if (state.view === 'browse' || state.view === 'detail') showView('dashboard');
+    else if (state.view === 'settings') showView(state.feisId ? 'dashboard' : 'picker');
+    else if (state.view === 'dashboard') showView('picker');
+  }
+
+  function currentFeis() { return FEISEANNA.find(f => f.id === state.feisId); }
+  function currentEvents() { return EVENTS[state.feisId] || []; }
+
+  function statusPillHTML(status) {
+    return '<span class="status-pill status-' + status + '">' + STATUS_LABEL[status] + '</span>';
+  }
+
+  function compCardHTML(ev, starred) {
+    return (
+      '<div class="comp-card" data-open-event="' + ev.id + '">' +
+        '<div class="comp-num">' + ev.name + '</div>' +
+        '<div class="comp-info">' +
+          '<p class="comp-title">' + ev.age + ' ' + ev.gender + ' ' + ev.event + '</p>' +
+          '<p class="comp-sub">' + ev.level + ' · ' + ev.participants + ' dancers</p>' +
+        '</div>' +
+        '<div class="comp-card-tail">' +
+          statusPillHTML(ev.status) +
+          '<button class="star-btn' + (starred ? ' active' : '') + '" data-star="' + ev.id + '" aria-label="Star">' +
+            '<svg viewBox="0 0 24 24" fill="' + (starred ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.8"><path d="M12 2.5l3.09 6.26 6.91 1-5 4.87 1.18 6.88L12 18.27l-6.18 3.25L7 14.63l-5-4.87 6.91-1L12 2.5z"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderPicker() {
+    $('#hdrTitle').textContent = 'Choose a feis';
+    $('#hdrEyebrow').textContent = 'Feis Day';
+    const list = FEISEANNA.map(f => {
+      const selected = f.id === state.feisId;
+      return (
+        '<div class="feis-card' + (selected ? ' selected' : '') + '" data-select-feis="' + f.id + '">' +
+          '<p class="name hero-font">' + f.name + '</p>' +
+          '<div class="meta"><span>' + f.dateLabel + '</span><span>·</span><span>' + f.loc_name + '</span></div>' +
+          (selected ? '<span class="badge-selected">Currently tracking</span>' : '') +
+        '</div>'
+      );
+    }).join('');
+    $('#feisList').innerHTML = list;
+  }
+
+  function renderDashboard() {
+    const feis = currentFeis();
+    $('#hdrEyebrow').textContent = 'Tracking';
+    $('#hdrTitle').textContent = feis ? feis.name : 'Dashboard';
+
+    if (feis) {
+      $('#venueName').textContent = feis.loc_name;
+      $('#venueAddr').textContent = feis.loc_addr;
+      $('#venueCard').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(feis.loc_addr);
+    }
+
+    const events = currentEvents();
+    const starredEvents = events.filter(e => state.starred.includes(e.id));
+
+    $('#starredList').innerHTML = starredEvents.map(e => compCardHTML(e, true)).join('');
+    $('#starredEmpty').style.display = starredEvents.length ? 'block' : 'none';
+  }
+
+  function renderBrowse() {
+    const feis = currentFeis();
+    $('#hdrEyebrow').textContent = feis ? feis.name : 'Add competitions';
+    $('#hdrTitle').textContent = 'Add competitions';
+    const events = currentEvents();
+    $('#browseList').innerHTML = events
+      .map(e => compCardHTML(e, state.starred.includes(e.id)))
+      .join('') || '<div class="empty">No competitions found for this feis.</div>';
+  }
+
+  function renderDetail() {
+    const events = currentEvents();
+    const ev = events.find(e => e.id === state.detailEventId);
+    if (!ev) { showView('dashboard'); return; }
+    $('#hdrEyebrow').textContent = ev.name;
+    $('#hdrTitle').textContent = ev.age + ' ' + ev.gender + ' ' + ev.event;
+
+    const band = $('#detailBand');
+    band.className = 'detail-status-band band-' + ev.status;
+    $('#detailLabel').textContent = ev.level + ' · ' + ev.participants + ' dancers';
+    $('#detailValue').textContent = STATUS_LABEL[ev.status];
+
+    const hasResults = ev.status === 'RES';
+    $('#dancerListLabel').textContent = hasResults ? 'Results' : 'Dancers (alphabetical)';
+    const dancers = makeDancers(ev.id, Math.min(ev.participants, 10), hasResults);
+    $('#dancerList').innerHTML = dancers.map(d => {
+      const chip = hasResults
+        ? '<div class="placement-chip' + (d.score.placement <= 3 ? ' top3' : '') + '">' + d.score.placement + '</div>'
+        : '<div class="placement-chip">' + d.competitor + '</div>';
+      return (
+        '<div class="dancer-row">' + chip +
+          '<div style="flex:1;">' +
+            '<div class="dancer-name">' + d.fname + ' ' + d.lname + '</div>' +
+            '<div class="dancer-school">' + d.school + '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function renderSettings() {
+    $('#hdrEyebrow').textContent = 'Feis Day';
+    $('#hdrTitle').textContent = 'Settings';
+    const feis = currentFeis();
+    $('#settingsFeisName').textContent = feis ? feis.name : 'No feis selected';
+  }
+
+  function render() {
+    if (state.view === 'picker') renderPicker();
+    else if (state.view === 'dashboard') renderDashboard();
+    else if (state.view === 'browse') renderBrowse();
+    else if (state.view === 'detail') renderDetail();
+    else if (state.view === 'settings') renderSettings();
+  }
+
+  // ---------- Events ----------
+  document.body.addEventListener('click', function(e) {
+    const feisEl = e.target.closest('[data-select-feis]');
+    if (feisEl) {
+      state.feisId = feisEl.getAttribute('data-select-feis');
+      store.set('feisId', state.feisId);
+      showView('dashboard');
+      return;
+    }
+    const starEl = e.target.closest('[data-star]');
+    if (starEl) {
+      e.stopPropagation();
+      const id = starEl.getAttribute('data-star');
+      const idx = state.starred.indexOf(id);
+      if (idx === -1) state.starred.push(id); else state.starred.splice(idx, 1);
+      saveStarred();
+      render();
+      return;
+    }
+    const openEl = e.target.closest('[data-open-event]');
+    if (openEl) {
+      state.detailEventId = openEl.getAttribute('data-open-event');
+      showView('detail');
+      return;
+    }
+  });
+
+  $('#settingsBtn').addEventListener('click', () => showView('settings'));
+  $('#addCompBtn').addEventListener('click', () => showView('browse'));
+  $('#emptyAddBtn').addEventListener('click', () => showView('browse'));
+  $('#headerBackBtn').addEventListener('click', goBack);
+  $('#changeFeisBtn').addEventListener('click', () => showView('picker'));
+
+  ['notifyCI','notifyRes'].forEach(id => {
+    const el = document.getElementById(id);
+    el.checked = store.get(id, true);
+    el.addEventListener('change', () => store.set(id, el.checked));
+  });
+
+  // ---------- Init ----------
+  showView(state.feisId ? 'dashboard' : 'picker');
+})();
+</script>
+</body>
+</html>

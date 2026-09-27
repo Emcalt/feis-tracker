@@ -1,0 +1,5 @@
+.DS_Store
+.env
+*.local.json
+node_modules/
+.wrangler/
