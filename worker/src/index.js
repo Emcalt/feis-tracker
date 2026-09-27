@@ -1,15 +1,15 @@
 // Feis Day alert checker (Cloudflare Worker)
 //
 // - Every 2 minutes (cron), during the tracked feis only, fetches the feis's competitions from
-//   iFeis, works out each starred competition's status, and sends an ntfy push when one moves
+//   iFeis, works out each starred competition's status, and sends a Pushover alert when one moves
 //   into "checking in" or "results posted". Each status is alerted at most once per competition.
 // - The phone app keeps the watch list in sync via PUT /watch, authenticated with SYNC_KEY.
 //
-// Secrets (set with `wrangler secret put`, never committed): NTFY_TOPIC, SYNC_KEY, NTFY_TOKEN
+// Secrets (set in Cloudflare, never committed): SYNC_KEY, PUSHOVER_USER, PUSHOVER_TOKEN
 // KV namespace binding: FEIS_KV
 
 const IFEIS = 'https://api.ifeis.net/api';
-const NTFY = 'https://ntfy.sh';
+const PUSHOVER = 'https://api.pushover.net/1/messages.json';
 const APP_URL = 'https://emcalt.github.io/feis-tracker/';
 const ALLOWED_ORIGINS = ['https://emcalt.github.io', 'http://localhost:8765'];
 const HOUR = 60 * 60 * 1000;
@@ -27,8 +27,8 @@ function deriveStatus(ev) {
 }
 
 const ALERTS = {
-  CI:  { setting: 'ci',  text: 'is checking in',   tags: 'white_check_mark', priority: '4' },
-  RES: { setting: 'res', text: 'results are posted', tags: 'trophy',          priority: '4' },
+  CI:  { setting: 'ci',  text: 'is checking in' },
+  RES: { setting: 'res', text: 'results are posted' },
 };
 
 function titleFor(ev) {
@@ -60,21 +60,25 @@ async function ifeis(path) {
   catch (e) { throw new Error('iFeis returned non-JSON (possibly a bot check)'); }
 }
 
-async function notify(env, { title, message, tags, priority }) {
-  const res = await fetch(NTFY + '/' + env.NTFY_TOPIC, {
+// Pushover limits are per account, so Cloudflare's shared IPs don't matter (unlike ntfy.sh).
+// priority 1 = high: shown as Time Sensitive on iPhone, so it gets through Focus modes.
+async function notify(env, { title, message, priority = 0 }) {
+  const res = await fetch(PUSHOVER, {
     method: 'POST',
-    body: message,
-    headers: {
-      'Title': title,
-      'Tags': tags || '',
-      'Priority': priority || '3',
-      'Click': APP_URL,
-      // ntfy.sh rate-limits by IP, and Cloudflare's IPs are shared with everyone else's Workers.
-      // Publishing with an ntfy account token makes the limit per-user instead.
-      ...(env.NTFY_TOKEN ? { 'Authorization': 'Bearer ' + env.NTFY_TOKEN } : {}),
-    },
+    body: new URLSearchParams({
+      token: env.PUSHOVER_TOKEN,
+      user: env.PUSHOVER_USER,
+      title,
+      message,
+      priority: String(priority),
+      url: APP_URL,
+      url_title: 'Open Feis Day',
+    }),
   });
-  if (!res.ok) throw new Error('ntfy HTTP ' + res.status);
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => '')).slice(0, 200);
+    throw new Error('Pushover HTTP ' + res.status + (detail ? ': ' + detail : ''));
+  }
 }
 
 // ---------- the check ----------
@@ -97,7 +101,7 @@ async function runCheck(env, { force = false } = {}) {
     if (!health.blockedAlertAt || now - health.blockedAlertAt > BLOCKED_ALERT_EVERY) {
       health.blockedAlertAt = now;
       try {
-        await notify(env, { title: 'Feis Day alerts paused', message: "The alert checker can't reach iFeis (" + e.message + "). Check the app directly for now.", tags: 'warning' });
+        await notify(env, { title: 'Feis Day alerts paused', message: "The alert checker can't reach iFeis (" + e.message + "). Check the app directly for now." });
       } catch (_) {}
     }
     await putJSON(env, 'health', health);
@@ -126,7 +130,7 @@ async function runCheck(env, { force = false } = {}) {
     if (alert && settings[alert.setting] !== false && !prev.alerted.includes(status)) {
       prev.alerted.push(status);
       const title = ev.name + ' ' + alert.text;
-      await notify(env, { title, message: titleFor(ev) + (ev.level ? ' · ' + ev.level : ''), tags: alert.tags, priority: alert.priority });
+      await notify(env, { title, message: titleFor(ev) + (ev.level ? ' · ' + ev.level : ''), priority: 1 });
       sent.push(title);
     }
   }
@@ -170,7 +174,6 @@ async function handle(req, env) {
     return json(req, {
       watch: await getJSON(env, 'watch', null),
       health: await getJSON(env, 'health', {}),
-      topic: env.NTFY_TOPIC,
     });
   }
 
@@ -194,7 +197,7 @@ async function handle(req, env) {
   }
 
   if (url.pathname === '/test' && req.method === 'POST') {
-    await notify(env, { title: 'Feis Day test alert', message: "If you can see this, alerts are working.", tags: 'bell' });
+    await notify(env, { title: 'Feis Day test alert', message: "If you can see this, alerts are working." });
     return json(req, { ok: true });
   }
 

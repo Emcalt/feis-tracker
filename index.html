@@ -386,7 +386,6 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .topic-name { color: var(--text); font-variant-numeric: tabular-nums; word-break: break-all; }
 
   ::selection { background: var(--accent-soft); }
 </style>
@@ -512,13 +511,6 @@
         </div>
         <button class="pill-btn" id="testAlertBtn" style="display:none;">Send test</button>
       </div>
-      <div class="settings-row" id="topicRow" style="display:none;">
-        <div style="min-width:0;">
-          <div class="label">ntfy topic</div>
-          <div class="sub">Subscribe to this in the ntfy app: <span id="topicName" class="topic-name"></span></div>
-        </div>
-        <button class="pill-btn" id="copyTopicBtn">Copy</button>
-      </div>
 
       <div class="settings-row" id="pasteKeyRow" style="display:none;">
         <div style="min-width:0;">
@@ -531,7 +523,7 @@
       <p class="section-label">About</p>
       <div class="proto-note" style="margin-bottom:0;">
         <span>●</span>
-        <span>Live data comes straight from iFeis and refreshes every minute while the app is open. Alerts come from a small checker on Cloudflare that looks at iFeis every 2 minutes during the feis you're tracking.</span>
+        <span>Live data comes straight from iFeis and refreshes every minute while the app is open. Alerts come from a small checker on Cloudflare that looks at iFeis every 2 minutes during the feis you're tracking, and arrive through the Pushover app.</span>
       </div>
     </section>
 
@@ -633,7 +625,7 @@
     showEmpty: false,
     error: null,
     syncKey: store.get('syncKey', null),
-    alerts: { status: 'idle', topic: null, health: null },
+    alerts: { status: 'idle', health: null },
   };
   const cachedEvents = store.get('eventsCache', null);
   if (cachedEvents && cachedEvents.feisId === state.feisId) {
@@ -692,7 +684,6 @@
     if (!alertsReady()) return;
     try {
       const info = await alertsApi('GET', '/watch');
-      state.alerts.topic = info.topic;
       state.alerts.health = info.health || {};
       if (state.alerts.status === 'idle') state.alerts.status = 'synced';
     } catch (e) {
@@ -982,8 +973,6 @@
     $('#alertStatus').textContent = text;
     $('#testAlertBtn').style.display = alertsReady() && a.status !== 'badkey' ? 'block' : 'none';
     $('#pasteKeyRow').style.display = ALERTS_API && (!state.syncKey || a.status === 'badkey') ? 'flex' : 'none';
-    $('#topicRow').style.display = a.topic ? 'flex' : 'none';
-    $('#topicName').textContent = a.topic || '';
   }
 
   function render() {
@@ -1045,12 +1034,6 @@
     syncWatch();
     loadAlertInfo();
     renderSettings();
-  });
-  $('#copyTopicBtn').addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
-    try { await navigator.clipboard.writeText(state.alerts.topic); btn.textContent = 'Copied ✓'; }
-    catch (err) { btn.textContent = 'Copy failed'; }
-    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
   });
   $('#addCompBtn').addEventListener('click', () => showView('browse'));
   $('#emptyAddBtn').addEventListener('click', () => showView('browse'));

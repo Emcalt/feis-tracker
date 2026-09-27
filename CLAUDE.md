@@ -15,13 +15,14 @@ Full background, API notes and design decisions: `docs/project-brief.md`. This f
 - Alert checker: Cloudflare Worker `feis-day` at https://feis-day.feis-day-worker.workers.dev (code in `worker/`).
   Node.js is installed at `~/.local/node/bin` (add to PATH). Deploy: `cd worker && npx wrangler deploy`.
   Cloudflare account is logged in via `wrangler login`.
-- Secrets live only in Cloudflare (`wrangler secret put NTFY_TOPIC` / `SYNC_KEY`) and in the git-ignored
-  `worker/.secrets/feis-day.env` (plus `setup-qr.png`, a QR of the phone setup link). Never print or commit them.
+- Secrets live only in Cloudflare: `SYNC_KEY` (also in the git-ignored `worker/.secrets/feis-day.env`, with
+  `setup-qr.png`, a QR of the phone setup link), and `PUSHOVER_USER` / `PUSHOVER_TOKEN` (entered by the user in the
+  Cloudflare dashboard). Never print or commit them.
 
 ## Decisions made (2026-09-27)
 - **Public repo + GitHub Pages** for the front end. Secrets (iFeis JWT, ntfy topic name) must never be committed — they go in the backend's encrypted secrets.
 - **Alerts backend: Cloudflare Workers cron**, not GitHub Actions — timing matters and Actions schedules can run 10–30+ min late. Fallback if iFeis blocks Cloudflare: a Raspberry Pi at home. Polling from the user's laptop was rejected (too much running around at a feis).
-- **Notifications: ntfy** app on the user's phone.
+- **Notifications: Pushover** app on the user's phone. (ntfy.sh was tried first and dropped: its free tier rate-limits per IP, and Cloudflare Worker IPs are shared, so publishes got `429 daily message quota reached` even with a free ntfy account token — per-user limits need a paid ntfy plan.)
 - **Privacy:** drop `dob` on fetch; never store or display it. Dancer lists are kept in memory only, not localStorage.
 
 ## What we've learned about the API (beyond the brief)
@@ -36,7 +37,7 @@ Full background, API notes and design decisions: `docs/project-brief.md`. This f
   One iFeis request (`/events` for that feis) per run.
 - Alerts on status change into CI or RES, once per status per competition (stored in KV `seen`). First sighting
   of a competition is recorded as a baseline, not alerted. Switching feis resets `seen`.
-- If iFeis errors / returns non-JSON, sends a "alerts paused" push at most every 6 h.
+- Alerts are Pushover priority 1 (Time Sensitive on iPhone). If iFeis errors / returns non-JSON, sends an "alerts paused" push at most every 6 h.
 - The app PUTs `/watch` (feis, starred ids, alert toggles) whenever stars/toggles/feis change, with header
   `X-Feis-Key`. iOS Home Screen apps have storage separate from Safari, so setup is: scan QR → Safari page
   offers "Copy setup code" → Home Screen app → Settings → Paste.
@@ -46,5 +47,5 @@ Full background, API notes and design decisions: `docs/project-brief.md`. This f
 ## Status / next steps
 1. ✅ Front end reads live iFeis data (feis picker, starred comps per feis, search, dancer/results view, refresh every 60s while open).
 2. ⏭ At the next live feis (~Oct 17–18, 2026): confirm status flags during check-in/dancing/tabulation, and when the dancer list appears.
-3. ✅ Cloudflare Worker deployed and wired to the app (2026-09-27). User still to: subscribe to the topic in ntfy, paste setup code, send a test.
+3. ✅ Cloudflare Worker deployed and wired to the app (2026-09-27). Setup code pasted on the phone. Pending: user adds Pushover keys in Cloudflare, then Send test.
 4. Open decision: manual feis/competition watch list vs. `/mine` + stored JWT.
