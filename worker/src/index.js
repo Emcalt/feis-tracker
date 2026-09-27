@@ -5,7 +5,7 @@
 //   into "checking in" or "results posted". Each status is alerted at most once per competition.
 // - The phone app keeps the watch list in sync via PUT /watch, authenticated with SYNC_KEY.
 //
-// Secrets (set with `wrangler secret put`, never committed): NTFY_TOPIC, SYNC_KEY
+// Secrets (set with `wrangler secret put`, never committed): NTFY_TOPIC, SYNC_KEY, NTFY_TOKEN
 // KV namespace binding: FEIS_KV
 
 const IFEIS = 'https://api.ifeis.net/api';
@@ -69,6 +69,9 @@ async function notify(env, { title, message, tags, priority }) {
       'Tags': tags || '',
       'Priority': priority || '3',
       'Click': APP_URL,
+      // ntfy.sh rate-limits by IP, and Cloudflare's IPs are shared with everyone else's Workers.
+      // Publishing with an ntfy account token makes the limit per-user instead.
+      ...(env.NTFY_TOKEN ? { 'Authorization': 'Bearer ' + env.NTFY_TOKEN } : {}),
     },
   });
   if (!res.ok) throw new Error('ntfy HTTP ' + res.status);
